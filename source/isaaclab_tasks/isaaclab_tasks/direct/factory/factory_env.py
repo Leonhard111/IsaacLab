@@ -66,27 +66,7 @@ class FactoryEnv(DirectRLEnv):
         self.fixed_pos_obs_frame = torch.zeros((self.num_envs, 3), device=self.device)
         self.init_fixed_pos_obs_noise = torch.zeros((self.num_envs, 3), device=self.device)
 
-        # Computer body indices.
-        # self.left_finger_body_idx = self._robot.body_names.index("panda_leftfinger")
-        # self.right_finger_body_idx = self._robot.body_names.index("panda_rightfinger")
-        # self.fingertip_body_idx = self._robot.body_names.index("panda_fingertip_centered")
         print(self._robot.body_names)
-        # self.left_finger_body_idx = self._robot.body_names.index("left_inner_finger")
-        # self.right_finger_body_idx = self._robot.body_names.index("right_inner_finger")  #robotiq_arg2f_base_link
-        # self.mid_finger_body_idx = self._robot.body_names.index("robotiq_arg2f_base_link")
-        # self.left_fingertip_view = XformPrimView(
-        #     prim_path="/World/envs/.*/Robot/robotiq/left_inner_finger/left_centered",
-        #     device=self.device,
-        #     stage=self.scene.stage,
-        #     validate_xform_ops=False,
-        # )
-
-        # self.right_fingertip_view = XformPrimView(
-        #     prim_path="/World/envs/.*/Robot/robotiq/right_inner_finger/right_centered",
-        #     device=self.device,
-        #     stage=self.scene.stage,
-        #     validate_xform_ops=False,
-        # )
 
         self.mid_finger_body_idx = self._robot.body_names.index("tip_centered")
         
@@ -712,6 +692,14 @@ class FactoryEnv(DirectRLEnv):
             n_bad = bad_envs.shape[0]
 
             above_fixed_pos = fixed_tip_pos.clone()
+            print("*****************")
+            print("*****************")
+            print("*****************")
+            print(above_fixed_pos)
+            above_fixed_pos[:,2] += 0.1
+            print("*****************")
+            print("*****************")
+            print("*****************")
             above_fixed_pos[:, 2] += self.cfg_task.hand_init_pos[2]
 
             rand_sample = torch.rand((n_bad, 3), dtype=torch.float32, device=self.device)
@@ -811,6 +799,7 @@ class FactoryEnv(DirectRLEnv):
 
         held_state = self._held_asset.data.default_root_state.clone()
         held_state[:, 0:3] = translated_held_asset_pos + self.scene.env_origins
+        held_state[:, 2] -= 0.05
         held_state[:, 3:7] = translated_held_asset_quat
         held_state[:, 7:] = 0.0
         self._held_asset.write_root_pose_to_sim(held_state[:, 0:7])
@@ -830,8 +819,8 @@ class FactoryEnv(DirectRLEnv):
         self.step_sim_no_action()
 
         grasp_time = 0.0
-        while grasp_time < 0.25:
-            self.ctrl_target_joint_pos[env_ids, 7:] = 40.0  # Close gripper.
+        while grasp_time < 0.5: #  0.25
+            self.ctrl_target_joint_pos[env_ids, 7:] = 0.7  # Close gripper.
             self.close_gripper_in_place()
             self.step_sim_no_action()
             grasp_time += self.sim.get_physics_dt()
