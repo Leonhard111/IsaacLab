@@ -11,7 +11,7 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import PhysxCfg, SimulationCfg
 from isaaclab.sim.spawners.materials.physics_materials_cfg import RigidBodyMaterialCfg
 from isaaclab.utils import configclass
-
+SELF_ASSET_DIR = "/home/ubuntu/Downloads/test/"
 from .factory_tasks_cfg import ASSET_DIR, FactoryTask, GearMesh, NutThread, PegInsert
 
 OBS_DIM_CFG = {
@@ -121,7 +121,7 @@ class FactoryEnvCfg(DirectRLEnvCfg):
     robot = ArticulationCfg(
         prim_path="/World/envs/env_.*/Robot",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ASSET_DIR}/franka_mimic.usd",
+            usd_path=f"{SELF_ASSET_DIR}/tacRL.usd",
             activate_contact_sensors=True,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 disable_gravity=True,
@@ -151,7 +151,7 @@ class FactoryEnvCfg(DirectRLEnvCfg):
                 "panda_joint5": -0.00083,
                 "panda_joint6": 1.38774,
                 "panda_joint7": 0.0,
-                "panda_finger_joint2": 0.04,
+                "finger_joint": 0.0,   #  0.70   0.04
             },
             pos=(0.0, 0.0, 0.0),
             rot=(1.0, 0.0, 0.0, 0.0),
@@ -176,7 +176,7 @@ class FactoryEnvCfg(DirectRLEnvCfg):
                 velocity_limit_sim=149.5,
             ),
             "panda_hand": ImplicitActuatorCfg(
-                joint_names_expr=["panda_finger_joint[1-2]"],
+                joint_names_expr=["finger_joint"],
                 effort_limit_sim=40.0,
                 velocity_limit_sim=0.04,
                 stiffness=7500.0,
@@ -187,6 +187,17 @@ class FactoryEnvCfg(DirectRLEnvCfg):
         },
     )
 
+    print("************************")
+    print("************************")
+    print("************************")
+    print("************************")
+    print("************************")
+    print("tacRL_robot")
+    print("************************")
+    print("************************")
+    print("************************")
+    print("************************")
+    print("************************")
 
 @configclass
 class FactoryTaskPegInsertCfg(FactoryEnvCfg):

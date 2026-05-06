@@ -19,7 +19,7 @@ from isaaclab.utils.math import axis_angle_from_quat
 from . import factory_control, factory_utils
 from .factory_env_cfg import OBS_DIM_CFG, STATE_DIM_CFG, FactoryEnvCfg
 
-
+from isaaclab.sim.views import XformPrimView
 class FactoryEnv(DirectRLEnv):
     cfg: FactoryEnvCfg
 
@@ -67,10 +67,30 @@ class FactoryEnv(DirectRLEnv):
         self.init_fixed_pos_obs_noise = torch.zeros((self.num_envs, 3), device=self.device)
 
         # Computer body indices.
-        self.left_finger_body_idx = self._robot.body_names.index("panda_leftfinger")
-        self.right_finger_body_idx = self._robot.body_names.index("panda_rightfinger")
-        self.fingertip_body_idx = self._robot.body_names.index("panda_fingertip_centered")
+        # self.left_finger_body_idx = self._robot.body_names.index("panda_leftfinger")
+        # self.right_finger_body_idx = self._robot.body_names.index("panda_rightfinger")
+        # self.fingertip_body_idx = self._robot.body_names.index("panda_fingertip_centered")
+        print(self._robot.body_names)
+        # self.left_finger_body_idx = self._robot.body_names.index("left_inner_finger")
+        # self.right_finger_body_idx = self._robot.body_names.index("right_inner_finger")  #robotiq_arg2f_base_link
+        # self.mid_finger_body_idx = self._robot.body_names.index("robotiq_arg2f_base_link")
+        # self.left_fingertip_view = XformPrimView(
+        #     prim_path="/World/envs/.*/Robot/robotiq/left_inner_finger/left_centered",
+        #     device=self.device,
+        #     stage=self.scene.stage,
+        #     validate_xform_ops=False,
+        # )
 
+        # self.right_fingertip_view = XformPrimView(
+        #     prim_path="/World/envs/.*/Robot/robotiq/right_inner_finger/right_centered",
+        #     device=self.device,
+        #     stage=self.scene.stage,
+        #     validate_xform_ops=False,
+        # )
+
+        self.mid_finger_body_idx = self._robot.body_names.index("tip_centered")
+        
+        
         # Tensors for finite-differencing.
         self.last_update_timestamp = 0.0  # Note: This is for finite differencing body velocities.
         self.prev_fingertip_pos = torch.zeros((self.num_envs, 3), device=self.device)
@@ -124,16 +144,26 @@ class FactoryEnv(DirectRLEnv):
         self.held_pos = self._held_asset.data.root_pos_w - self.scene.env_origins
         self.held_quat = self._held_asset.data.root_quat_w
 
-        self.fingertip_midpoint_pos = self._robot.data.body_pos_w[:, self.fingertip_body_idx] - self.scene.env_origins
-        self.fingertip_midpoint_quat = self._robot.data.body_quat_w[:, self.fingertip_body_idx]
-        self.fingertip_midpoint_linvel = self._robot.data.body_lin_vel_w[:, self.fingertip_body_idx]
-        self.fingertip_midpoint_angvel = self._robot.data.body_ang_vel_w[:, self.fingertip_body_idx]
 
+        self.fingertip_midpoint_pos = self._robot.data.body_pos_w[:, self.mid_finger_body_idx] - self.scene.env_origins
+        self.fingertip_midpoint_quat = self._robot.data.body_quat_w[:, self.mid_finger_body_idx]
+        self.fingertip_midpoint_linvel = self._robot.data.body_lin_vel_w[:, self.mid_finger_body_idx]
+        self.fingertip_midpoint_angvel = self._robot.data.body_ang_vel_w[:, self.mid_finger_body_idx]
+
+        # # 获取左右指尖的世界位姿和速度 (形状: [num_envs, 3] 和 [num_envs, 4])
+        # left_pos_w, left_quat_w = self.left_fingertip_view.get_world_poses()   # pos: (num_envs, 3), quat: (num_envs, 4) wxyz
+        # right_pos_w, right_quat_w = self.right_fingertip_view.get_world_poses()
+        # # print(f"left_quat_w:{left_quat_w}, right_quat_w:{right_quat_w}")
+        # # 计算中间点（和原来逻辑一致）
+        # self.fingertip_midpoint_pos = (left_pos_w + right_pos_w) / 2 - self.scene.env_origins
+        # # self.fingertip_midpoint_quat = left_quat_w                                # 你原来用左边的四元数
+        # self.fingertip_midpoint_quat = self._robot.data.body_quat_w[:, self.mid_finger_body_idx]
         jacobians = self._robot.root_physx_view.get_jacobians()
 
-        self.left_finger_jacobian = jacobians[:, self.left_finger_body_idx - 1, 0:6, 0:7]
-        self.right_finger_jacobian = jacobians[:, self.right_finger_body_idx - 1, 0:6, 0:7]
-        self.fingertip_midpoint_jacobian = (self.left_finger_jacobian + self.right_finger_jacobian) * 0.5
+        # self.left_finger_jacobian = jacobians[:, self.left_finger_body_idx - 1, 0:6, 0:7]
+        # self.right_finger_jacobian = jacobians[:, self.right_finger_body_idx - 1, 0:6, 0:7]
+        # self.fingertip_midpoint_jacobian = (self.left_finger_jacobian + self.right_finger_jacobian) * 0.5
+        self.fingertip_midpoint_jacobian = jacobians[:, self.mid_finger_body_idx - 1, 0:6, 0:7]
         self.arm_mass_matrix = self._robot.root_physx_view.get_generalized_mass_matrices()[:, 0:7, 0:7]
         self.joint_pos = self._robot.data.joint_pos.clone()
         self.joint_vel = self._robot.data.joint_vel.clone()
@@ -141,6 +171,7 @@ class FactoryEnv(DirectRLEnv):
         # Finite-differencing results in more reliable velocity estimates.
         self.ee_linvel_fd = (self.fingertip_midpoint_pos - self.prev_fingertip_pos) / dt
         self.prev_fingertip_pos = self.fingertip_midpoint_pos.clone()
+        # self.fingertip_midpoint_linvel = self.ee_linvel_fd
 
         # Add state differences if velocity isn't being added.
         rot_diff_quat = torch_utils.quat_mul(
@@ -150,6 +181,7 @@ class FactoryEnv(DirectRLEnv):
         rot_diff_aa = axis_angle_from_quat(rot_diff_quat)
         self.ee_angvel_fd = rot_diff_aa / dt
         self.prev_fingertip_quat = self.fingertip_midpoint_quat.clone()
+        # self.fingertip_midpoint_angvel = self.ee_angvel_fd
 
         joint_diff = self.joint_pos[:, 0:7] - self.prev_joint_pos
         self.joint_vel_fd = joint_diff / dt
@@ -298,7 +330,7 @@ class FactoryEnv(DirectRLEnv):
         self.generate_ctrl_signals(
             ctrl_target_fingertip_midpoint_pos=ctrl_target_fingertip_midpoint_pos,
             ctrl_target_fingertip_midpoint_quat=ctrl_target_fingertip_midpoint_quat,
-            ctrl_target_gripper_dof_pos=0.0,
+            ctrl_target_gripper_dof_pos=0.7,
         )
 
     def generate_ctrl_signals(
@@ -325,7 +357,7 @@ class FactoryEnv(DirectRLEnv):
 
         # set target for gripper joints to use physx's PD controller
         self.ctrl_target_joint_pos[:, 7:9] = ctrl_target_gripper_dof_pos
-        self.joint_torque[:, 7:9] = 0.0
+        self.joint_torque[:, 7:9] = 0.0 # 0.0 
 
         self._robot.set_joint_position_target(self.ctrl_target_joint_pos)
         self._robot.set_joint_effort_target(self.joint_torque)
@@ -586,7 +618,8 @@ class FactoryEnv(DirectRLEnv):
 
     def _set_franka_to_default_pose(self, joints, env_ids):
         """Return Franka to its default joint position."""
-        gripper_width = self.cfg_task.held_asset_cfg.diameter / 2 * 1.25
+        # gripper_width = self.cfg_task.held_asset_cfg.diameter / 2 * 1.25
+        gripper_width = 0.65    #真正有用的
         joint_pos = self._robot.data.default_joint_pos[env_ids]
         joint_pos[:, 7:] = gripper_width  # MIMIC
         joint_pos[:, :7] = torch.tensor(joints, device=self.device)[None, :]
@@ -675,6 +708,7 @@ class FactoryEnv(DirectRLEnv):
 
         hand_down_quat = torch.zeros((self.num_envs, 4), dtype=torch.float32, device=self.device)
         while True:
+            print("still initializing")
             n_bad = bad_envs.shape[0]
 
             above_fixed_pos = fixed_tip_pos.clone()
@@ -706,6 +740,7 @@ class FactoryEnv(DirectRLEnv):
                 ctrl_target_fingertip_midpoint_quat=hand_down_quat,
                 env_ids=bad_envs,
             )
+            print(pos_error, aa_error)
             pos_error = torch.linalg.norm(pos_error, dim=1) > 1e-3
             angle_error = torch.norm(aa_error, dim=1) > 1e-3
             any_error = torch.logical_or(pos_error, angle_error)
@@ -796,7 +831,7 @@ class FactoryEnv(DirectRLEnv):
 
         grasp_time = 0.0
         while grasp_time < 0.25:
-            self.ctrl_target_joint_pos[env_ids, 7:] = 0.0  # Close gripper.
+            self.ctrl_target_joint_pos[env_ids, 7:] = 40.0  # Close gripper.
             self.close_gripper_in_place()
             self.step_sim_no_action()
             grasp_time += self.sim.get_physics_dt()
