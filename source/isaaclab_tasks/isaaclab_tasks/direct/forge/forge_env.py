@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 import numpy as np
+import gymnasium as gym
 import torch
 
 import isaacsim.core.utils.torch as torch_utils
@@ -22,6 +23,21 @@ class ForgeEnv(FactoryEnv):
     def __init__(self, cfg: ForgeEnvCfg, render_mode: str | None = None, **kwargs):
         """Initialize additional randomization and logging tensors."""
         super().__init__(cfg, render_mode, **kwargs)
+
+        tactile_camera_cfg = self.cfg.tactile_sensor_left.camera_cfg
+        assert tactile_camera_cfg is not None
+        tactile_image_height = tactile_camera_cfg.height
+        tactile_image_width = tactile_camera_cfg.width
+        tactile_policy_space = gym.spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(tactile_image_height, tactile_image_width, 6),
+            dtype=np.float32,
+        )
+        self.cfg.observation_space = tactile_policy_space
+        self.single_observation_space["policy"] = tactile_policy_space
+        self.observation_space = gym.vector.utils.batch_space(tactile_policy_space, self.num_envs)
+        self._tactile_policy_obs_ready = False
 
         # Success prediction.
         self.success_pred_scale = 0.0
@@ -115,22 +131,17 @@ class ForgeEnv(FactoryEnv):
 
     def _get_observations(self):
         """Add additional FORGE observations."""
-        obs_dict, state_dict = self._get_factory_obs_state_dict()
+        _, state_dict = self._get_factory_obs_state_dict()
 
-        noisy_fixed_pos = self.fixed_pos_obs_frame + self.init_fixed_pos_obs_noise
+        left_tactile_rgb = self._tactile_sensor_left.data.tactile_rgb_image
+        right_tactile_rgb = self._tactile_sensor_right.data.tactile_rgb_image
+        if left_tactile_rgb is None or right_tactile_rgb is None:
+            raise RuntimeError("Tactile RGB observations are not available. Call get_initial_render() first.")
+
+        obs_tensors = torch.cat((left_tactile_rgb, right_tactile_rgb), dim=-1)
+
         prev_actions = self.actions.clone()
         prev_actions[:, 3:5] = 0.0
-
-        obs_dict.update(
-            {
-                "fingertip_pos": self.noisy_fingertip_pos,
-                "fingertip_pos_rel_fixed": self.noisy_fingertip_pos - noisy_fixed_pos,
-                "fingertip_quat": self.noisy_fingertip_quat,
-                "force_threshold": self.contact_penalty_thresholds[:, None],
-                "ft_force": self.noisy_force,
-                "prev_actions": prev_actions,
-            }
-        )
 
         state_dict.update(
             {
@@ -141,7 +152,6 @@ class ForgeEnv(FactoryEnv):
             }
         )
 
-        obs_tensors = factory_utils.collapse_obs_dict(obs_dict, self.cfg.obs_order + ["prev_actions"])
         state_tensors = factory_utils.collapse_obs_dict(state_dict, self.cfg.state_order + ["prev_actions"])
         return {"policy": obs_tensors, "critic": state_tensors}
 
@@ -272,6 +282,11 @@ class ForgeEnv(FactoryEnv):
     def _reset_idx(self, env_ids):
         """Perform additional randomizations."""
         super()._reset_idx(env_ids)
+
+        if not self._tactile_policy_obs_ready and len(env_ids) == self.num_envs:
+            self._tactile_sensor_left.get_initial_render()
+            self._tactile_sensor_right.get_initial_render()
+            self._tactile_policy_obs_ready = True
 
         # Compute initial action for correct EMA computation.
         fixed_pos_action_frame = self.fixed_pos_obs_frame + self.init_fixed_pos_obs_noise

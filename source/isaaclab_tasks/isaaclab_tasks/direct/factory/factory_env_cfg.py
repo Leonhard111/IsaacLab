@@ -14,6 +14,14 @@ from isaaclab.utils import configclass
 SELF_ASSET_DIR = "/home/ubuntu/Downloads/test/"
 from .factory_tasks_cfg import ASSET_DIR, FactoryTask, GearMesh, NutThread, PegInsert
 
+
+# tac utils
+from isaaclab_contrib.sensors.tacsl_sensor import VisuoTactileSensorCfg
+from isaaclab_assets.sensors import GELSIGHT_R15_CFG
+from isaaclab.sensors import TiledCameraCfg
+
+
+
 OBS_DIM_CFG = {
     "fingertip_pos": 3,
     "fingertip_pos_rel_fixed": 3,
@@ -151,7 +159,7 @@ class FactoryEnvCfg(DirectRLEnvCfg):
                 "panda_joint5": -0.00083,
                 "panda_joint6": 1.38774,
                 "panda_joint7": 0.0,
-                "finger_joint": 0.0,   #  0.70   0.04
+                "finger_joint": 0.5,   #  0.70   0.04
             },
             pos=(0.0, 0.0, 0.0),
             rot=(1.0, 0.0, 0.0, 0.0),
@@ -177,16 +185,79 @@ class FactoryEnvCfg(DirectRLEnvCfg):
             ),
             "panda_hand": ImplicitActuatorCfg(
                 joint_names_expr=["finger_joint"],
-                effort_limit_sim=40.0,
-                velocity_limit_sim=0.04,
-                stiffness=7500.0,
-                damping=173.0,
-                friction=0.1,
-                armature=0.0,
+                stiffness=1500.0, 
+                damping=450.0, 
+                # friction=0.1,
+                # armature=0.0,
             ),
         },
     )
 
+    # TacSL Tactile Sensor
+    tactile_sensor_left = VisuoTactileSensorCfg(
+        prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_left/elastomer/tactile_sensor",
+        history_length=0,
+        debug_vis=False, #args_cli.debug_tactile_sensor_pts or args_cli.debug_sdf_closest_pts,
+        # Sensor configuration
+        render_cfg=GELSIGHT_R15_CFG,
+        enable_camera_tactile=True, #args_cli.use_tactile_rgb,
+        enable_force_field=True, #args_cli.use_tactile_ff,
+        # Elastomer configuration
+        tactile_array_size=(20, 25),
+        tactile_margin=0.003,
+        # Contact object configuration
+        contact_object_prim_path_expr="/World/envs/env_.*/HeldAsset/.*",
+        # Force field physics parameters
+        normal_contact_stiffness=1.0, #args_cli.normal_contact_stiffness,
+        friction_coefficient=2.0, #args_cli.friction_coefficient,
+        tangential_stiffness=0.1, #args_cli.tangential_stiffness,
+        # Camera configuration
+        # Note: the camera is already spawned in the scene, properties are set in the
+        # 'gelsight_r15_finger.usd' USD file
+        camera_cfg=TiledCameraCfg(
+            prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_left/elastomer_tip/cam",
+            height=GELSIGHT_R15_CFG.image_height,
+            width=GELSIGHT_R15_CFG.image_width,
+            data_types=["distance_to_image_plane"],
+            spawn=None,
+        ),
+        # Debug Visualization
+        trimesh_vis_tactile_points=False, #args_cli.trimesh_vis_tactile_points,
+        visualize_sdf_closest_pts=False, #args_cli.debug_sdf_closest_pts,
+    )
+    
+    tactile_sensor_right = VisuoTactileSensorCfg(
+        prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_right/elastomer/tactile_sensor",
+        history_length=0,
+        debug_vis=False, #args_cli.debug_tactile_sensor_pts or args_cli.debug_sdf_closest_pts,
+        # Sensor configuration
+        render_cfg=GELSIGHT_R15_CFG,
+        enable_camera_tactile=True, #args_cli.use_tactile_rgb,
+        enable_force_field=True, #args_cli.use_tactile_ff,
+        # Elastomer configuration
+        tactile_array_size=(20, 25),
+        tactile_margin=0.003,
+        # Contact object configuration
+        contact_object_prim_path_expr="/World/envs/env_.*/HeldAsset/.*",
+        # Force field physics parameters
+        normal_contact_stiffness=1.0, #args_cli.normal_contact_stiffness,
+        friction_coefficient=2.0, #args_cli.friction_coefficient,
+        tangential_stiffness=0.1, #args_cli.tangential_stiffness,
+        # Camera configuration
+        # Note: the camera is already spawned in the scene, properties are set in the
+        # 'gelsight_r15_finger.usd' USD file
+        camera_cfg=TiledCameraCfg(
+            prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_right/elastomer_tip/cam",
+            height=GELSIGHT_R15_CFG.image_height,
+            width=GELSIGHT_R15_CFG.image_width,
+            data_types=["distance_to_image_plane"],
+            spawn=None,
+        ),
+        # Debug Visualization
+        trimesh_vis_tactile_points=False, #args_cli.trimesh_vis_tactile_points,
+        visualize_sdf_closest_pts=False, #args_cli.debug_sdf_closest_pts,
+    )
+    
     print("************************")
     print("************************")
     print("************************")
@@ -204,6 +275,73 @@ class FactoryTaskPegInsertCfg(FactoryEnvCfg):
     task_name = "peg_insert"
     task = PegInsert()
     episode_length_s = 10.0
+
+    # # TacSL Tactile Sensor
+    # tactile_sensor_left = VisuoTactileSensorCfg(
+    #     prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_left/elastomer/tactile_sensor",
+    #     history_length=0,
+    #     debug_vis=False, #args_cli.debug_tactile_sensor_pts or args_cli.debug_sdf_closest_pts,
+    #     # Sensor configuration
+    #     render_cfg=GELSIGHT_R15_CFG,
+    #     enable_camera_tactile=True, #args_cli.use_tactile_rgb,
+    #     enable_force_field=True, #args_cli.use_tactile_ff,
+    #     # Elastomer configuration
+    #     tactile_array_size=(20, 25),
+    #     tactile_margin=0.003,
+    #     # Contact object configuration
+    #     contact_object_prim_path_expr="/World/envs/env_.*/HeldAsset/.*",
+    #     # Force field physics parameters
+    #     normal_contact_stiffness=1.0, #args_cli.normal_contact_stiffness,
+    #     friction_coefficient=2.0, #args_cli.friction_coefficient,
+    #     tangential_stiffness=0.1, #args_cli.tangential_stiffness,
+    #     # Camera configuration
+    #     # Note: the camera is already spawned in the scene, properties are set in the
+    #     # 'gelsight_r15_finger.usd' USD file
+    #     camera_cfg=TiledCameraCfg(
+    #         prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_left/elastomer_tip/cam",
+    #         height=GELSIGHT_R15_CFG.image_height,
+    #         width=GELSIGHT_R15_CFG.image_width,
+    #         data_types=["distance_to_image_plane"],
+    #         spawn=None,
+    #     ),
+    #     # Debug Visualization
+    #     trimesh_vis_tactile_points=False, #args_cli.trimesh_vis_tactile_points,
+    #     visualize_sdf_closest_pts=False, #args_cli.debug_sdf_closest_pts,
+    # )
+    
+    # tactile_sensor_right = VisuoTactileSensorCfg(
+    #     prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_right/elastomer/tactile_sensor",
+    #     history_length=0,
+    #     debug_vis=False, #args_cli.debug_tactile_sensor_pts or args_cli.debug_sdf_closest_pts,
+    #     # Sensor configuration
+    #     render_cfg=GELSIGHT_R15_CFG,
+    #     enable_camera_tactile=True, #args_cli.use_tactile_rgb,
+    #     enable_force_field=True, #args_cli.use_tactile_ff,
+    #     # Elastomer configuration
+    #     tactile_array_size=(20, 25),
+    #     tactile_margin=0.003,
+    #     # Contact object configuration
+    #     contact_object_prim_path_expr="/World/envs/env_.*/HeldAsset/.*",
+    #     # Force field physics parameters
+    #     normal_contact_stiffness=1.0, #args_cli.normal_contact_stiffness,
+    #     friction_coefficient=2.0, #args_cli.friction_coefficient,
+    #     tangential_stiffness=0.1, #args_cli.tangential_stiffness,
+    #     # Camera configuration
+    #     # Note: the camera is already spawned in the scene, properties are set in the
+    #     # 'gelsight_r15_finger.usd' USD file
+    #     camera_cfg=TiledCameraCfg(
+    #         prim_path="/World/envs/env_.*/Robot/robotiq/gelsight_r15_right/elastomer_tip/cam",
+    #         height=GELSIGHT_R15_CFG.image_height,
+    #         width=GELSIGHT_R15_CFG.image_width,
+    #         data_types=["distance_to_image_plane"],
+    #         spawn=None,
+    #     ),
+    #     # Debug Visualization
+    #     trimesh_vis_tactile_points=False, #args_cli.trimesh_vis_tactile_points,
+    #     visualize_sdf_closest_pts=False, #args_cli.debug_sdf_closest_pts,
+    # )
+
+
 
 
 @configclass

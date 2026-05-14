@@ -15,6 +15,7 @@ from isaaclab.envs import DirectRLEnv
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.utils.math import axis_angle_from_quat
+from isaaclab_contrib.sensors.tacsl_sensor import VisuoTactileSensor
 
 from . import factory_control, factory_utils
 from .factory_env_cfg import OBS_DIM_CFG, STATE_DIM_CFG, FactoryEnvCfg
@@ -66,8 +67,8 @@ class FactoryEnv(DirectRLEnv):
         self.fixed_pos_obs_frame = torch.zeros((self.num_envs, 3), device=self.device)
         self.init_fixed_pos_obs_noise = torch.zeros((self.num_envs, 3), device=self.device)
 
-        print(self._robot.body_names)
-
+        print("robot.body_names = ", self._robot.body_names)
+        print("robot.joint_names =", self._robot.joint_names)
         self.mid_finger_body_idx = self._robot.body_names.index("tip_centered")
         
         
@@ -95,6 +96,14 @@ class FactoryEnv(DirectRLEnv):
         self._robot = Articulation(self.cfg.robot)
         self._fixed_asset = Articulation(self.cfg_task.fixed_asset)
         self._held_asset = Articulation(self.cfg_task.held_asset)
+        
+        # Tactile sensors.
+        self._tactile_sensor_left = VisuoTactileSensor(self.cfg.tactile_sensor_left)
+        self._tactile_sensor_right = VisuoTactileSensor(self.cfg.tactile_sensor_right)
+        self.scene.sensors["tactile_sensor_left"] = self._tactile_sensor_left
+        self.scene.sensors["tactile_sensor_right"] = self._tactile_sensor_right
+        
+        
         if self.cfg_task.name == "gear_mesh":
             self._small_gear_asset = Articulation(self.cfg_task.small_gear_cfg)
             self._large_gear_asset = Articulation(self.cfg_task.large_gear_cfg)
@@ -336,8 +345,8 @@ class FactoryEnv(DirectRLEnv):
         )
 
         # set target for gripper joints to use physx's PD controller
-        self.ctrl_target_joint_pos[:, 7:9] = ctrl_target_gripper_dof_pos
-        self.joint_torque[:, 7:9] = 0.0 # 0.0 
+        self.ctrl_target_joint_pos[:, 7:] = ctrl_target_gripper_dof_pos
+        # self.joint_torque[:, 7:9] = 0.0 # 0.0 
 
         self._robot.set_joint_position_target(self.ctrl_target_joint_pos)
         self._robot.set_joint_effort_target(self.joint_torque)
@@ -599,7 +608,7 @@ class FactoryEnv(DirectRLEnv):
     def _set_franka_to_default_pose(self, joints, env_ids):
         """Return Franka to its default joint position."""
         # gripper_width = self.cfg_task.held_asset_cfg.diameter / 2 * 1.25
-        gripper_width = 0.65    #真正有用的
+        gripper_width = 0.6    #真正有用的
         joint_pos = self._robot.data.default_joint_pos[env_ids]
         joint_pos[:, 7:] = gripper_width  # MIMIC
         joint_pos[:, :7] = torch.tensor(joints, device=self.device)[None, :]
@@ -696,7 +705,7 @@ class FactoryEnv(DirectRLEnv):
             print("*****************")
             print("*****************")
             print(above_fixed_pos)
-            above_fixed_pos[:,2] += 0.1
+            # above_fixed_pos[:,2] += 0.05
             print("*****************")
             print("*****************")
             print("*****************")
@@ -799,7 +808,7 @@ class FactoryEnv(DirectRLEnv):
 
         held_state = self._held_asset.data.default_root_state.clone()
         held_state[:, 0:3] = translated_held_asset_pos + self.scene.env_origins
-        held_state[:, 2] -= 0.05
+        # held_state[:, 2] -= 0.01
         held_state[:, 3:7] = translated_held_asset_quat
         held_state[:, 7:] = 0.0
         self._held_asset.write_root_pose_to_sim(held_state[:, 0:7])
@@ -819,7 +828,7 @@ class FactoryEnv(DirectRLEnv):
         self.step_sim_no_action()
 
         grasp_time = 0.0
-        while grasp_time < 0.5: #  0.25
+        while grasp_time < 2.5: #  0.25
             self.ctrl_target_joint_pos[env_ids, 7:] = 0.7  # Close gripper.
             self.close_gripper_in_place()
             self.step_sim_no_action()
