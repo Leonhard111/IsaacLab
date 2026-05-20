@@ -173,13 +173,24 @@ class SensorBase(ABC):
             env_ids: The sensor ids to reset. Defaults to None.
         """
         # Resolve sensor ids
+        reset_env_ids: Any
         if env_ids is None:
-            env_ids = slice(None)
+            reset_env_ids = slice(None)
+        else:
+            reset_env_ids = torch.as_tensor(env_ids, dtype=torch.int64, device="cpu")
+            if reset_env_ids.numel() > 0:
+                min_env_id = int(reset_env_ids.min().item())
+                max_env_id = int(reset_env_ids.max().item())
+                if min_env_id < 0 or max_env_id >= self._timestamp.shape[0]:
+                    raise IndexError(
+                        "Sensor reset ids out of range: "
+                        f"min={min_env_id}, max={max_env_id}, num_envs={self._timestamp.shape[0]}"
+                    )
         # Reset the timestamp for the sensors
-        self._timestamp[env_ids] = 0.0
-        self._timestamp_last_update[env_ids] = 0.0
+        self._timestamp[reset_env_ids] = 0.0
+        self._timestamp_last_update[reset_env_ids] = 0.0
         # Set all reset sensors to outdated so that they are updated when data is called the next time.
-        self._is_outdated[env_ids] = True
+        self._is_outdated[reset_env_ids] = True
 
     def update(self, dt: float, force_recompute: bool = False):
         # Update the timestamp for the sensors

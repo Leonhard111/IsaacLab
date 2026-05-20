@@ -268,7 +268,7 @@ class FactoryEnv(DirectRLEnv):
         self.generate_ctrl_signals(
             ctrl_target_fingertip_midpoint_pos=ctrl_target_fingertip_midpoint_pos,
             ctrl_target_fingertip_midpoint_quat=ctrl_target_fingertip_midpoint_quat,
-            ctrl_target_gripper_dof_pos=0.0,
+            ctrl_target_gripper_dof_pos=0.66,
         )
 
     def _apply_action(self):
@@ -745,6 +745,7 @@ class FactoryEnv(DirectRLEnv):
 
             # Check IK succeeded for all envs, otherwise try again for those envs
             if bad_envs.shape[0] == 0:
+                print("successful IK")
                 break
 
             self._set_franka_to_default_pose(
@@ -808,7 +809,7 @@ class FactoryEnv(DirectRLEnv):
 
         held_state = self._held_asset.data.default_root_state.clone()
         held_state[:, 0:3] = translated_held_asset_pos + self.scene.env_origins
-        # held_state[:, 2] -= 0.01
+        held_state[:, 2] += 0.04
         held_state[:, 3:7] = translated_held_asset_quat
         held_state[:, 7:] = 0.0
         self._held_asset.write_root_pose_to_sim(held_state[:, 0:7])

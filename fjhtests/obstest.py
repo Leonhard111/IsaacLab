@@ -1,6 +1,7 @@
 # Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #python tests/envtest.py --task=Isaac-Forge-PegInsert-Direct-v0 --num_envs=1 --steps=200 --action_mode=random
+##python fjhtests/obstest.py --task=Isaac-Forge-PegInsert-Direct-v0 --num_envs=1 --steps=400 --action_mode=zero --save_viz
 
 # SPDX-License-Identifier: BSD-3-Clause
 
@@ -116,9 +117,9 @@ def save_viz_helper(
 
     if tactile_data.tactile_rgb_image is not None:
         tactile_rgb_data = tactile_data.tactile_rgb_image.cpu().numpy()
-        tactile_rgb_data = np.transpose(tactile_rgb_data, axes=(0, 2, 1, 3))
-        # print(f"tactile_rgb_data shape:{tactile_rgb_data.shape}")
-        # print(f"tactile_rgb_data type:{tactile_rgb_data.dtype}")
+        tactile_rgb_data = np.transpose(tactile_rgb_data, axes=(0, 1, 2, 3))
+        print(f"tactile_rgb_data shape:{tactile_rgb_data.shape}")
+        print(f"tactile_rgb_data type:{tactile_rgb_data.dtype}")
         tactile_rgb_data_first_2 = tactile_rgb_data[:2] if len(tactile_rgb_data) >= 2 else tactile_rgb_data
         tactile_rgb_tiled = np.concatenate(tactile_rgb_data_first_2, axis=0)
         # print(tactile_rgb_tiled.max() <= 1.0)
@@ -236,11 +237,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
             print(f"[INFO] Episode ended at step={step_index}, resetting environment.")
             obs, _ = env.reset()
 
-        # if args_cli.save_viz:
-        #     tactile_data = env_unwrapped.scene["tactile_sensor_left"].data
-        #     nrows = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[0]
-        #     ncols = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[1]
-        #     save_viz_helper(dir_path_list, step_index, tactile_data, args_cli.num_envs, nrows, ncols)
+        if args_cli.save_viz:
+            tactile_data = env_unwrapped.scene["tactile_sensor_left"].data
+            nrows = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[0]
+            ncols = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[1]
+            save_viz_helper(dir_path_list, step_index, tactile_data, args_cli.num_envs, nrows, ncols)
 
     env.close()
 

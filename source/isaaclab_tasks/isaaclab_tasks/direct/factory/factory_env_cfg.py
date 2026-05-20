@@ -77,7 +77,7 @@ class CtrlCfg:
 
 @configclass
 class FactoryEnvCfg(DirectRLEnvCfg):
-    decimation = 8
+    decimation = 12    # dt = 1 / 120
     action_space = 6
     # num_*: will be overwritten to correspond to obs_order, state_order.
     observation_space = 21
@@ -200,10 +200,10 @@ class FactoryEnvCfg(DirectRLEnvCfg):
         debug_vis=False, #args_cli.debug_tactile_sensor_pts or args_cli.debug_sdf_closest_pts,
         # Sensor configuration
         render_cfg=GELSIGHT_R15_CFG,
-        enable_camera_tactile=True, #args_cli.use_tactile_rgb,
+        enable_camera_tactile=False, #args_cli.use_tactile_rgb,
         enable_force_field=True, #args_cli.use_tactile_ff,
         # Elastomer configuration
-        tactile_array_size=(20, 25),
+        tactile_array_size=(20, 20),
         tactile_margin=0.003,
         # Contact object configuration
         contact_object_prim_path_expr="/World/envs/env_.*/HeldAsset/.*",
@@ -232,10 +232,10 @@ class FactoryEnvCfg(DirectRLEnvCfg):
         debug_vis=False, #args_cli.debug_tactile_sensor_pts or args_cli.debug_sdf_closest_pts,
         # Sensor configuration
         render_cfg=GELSIGHT_R15_CFG,
-        enable_camera_tactile=True, #args_cli.use_tactile_rgb,
+        enable_camera_tactile=False, #args_cli.use_tactile_rgb,
         enable_force_field=True, #args_cli.use_tactile_ff,
         # Elastomer configuration
-        tactile_array_size=(20, 25),
+        tactile_array_size=(20, 20),
         tactile_margin=0.003,
         # Contact object configuration
         contact_object_prim_path_expr="/World/envs/env_.*/HeldAsset/.*",

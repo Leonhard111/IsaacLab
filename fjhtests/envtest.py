@@ -1,7 +1,7 @@
 # Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #python tests/envtest.py --task=Isaac-Forge-PegInsert-Direct-v0 --num_envs=1 --steps=200 --action_mode=random
-
+#python fjhtests/envtest.py --task=Isaac-Forge-PegInsert-Direct-v0 --num_envs=1 --steps=400 --action_mode=zero --save_viz
 # SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
@@ -236,11 +236,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
             print(f"[INFO] Episode ended at step={step_index}, resetting environment.")
             obs, _ = env.reset()
 
-        # if args_cli.save_viz:
-        #     tactile_data = env_unwrapped.scene["tactile_sensor_left"].data
-        #     nrows = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[0]
-        #     ncols = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[1]
-        #     save_viz_helper(dir_path_list, step_index, tactile_data, args_cli.num_envs, nrows, ncols)
+        if args_cli.save_viz:
+            tactile_data = env_unwrapped.scene["tactile_sensor_left"].data
+            nrows = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[0]
+            ncols = env_unwrapped.scene["tactile_sensor_left"].cfg.tactile_array_size[1]
+            save_viz_helper(dir_path_list, step_index, tactile_data, args_cli.num_envs, nrows, ncols)
 
     env.close()
 

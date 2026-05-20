@@ -16,3 +16,11 @@ TODO:
 
 _get_rewards：
 目前看来可能不需要大改，先不管了，后面再说
+
+
+IK或是其他设置初始的位姿的步骤有点问题
+
+
+train:
+
+CUDA_VISIBLE_DEVICES=3 

@@ -2,3 +2,5 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+
+from . import forge_custom_network  # noqa: F401

@@ -15,7 +15,7 @@ params:
     name: continuous_a2c_logstd
 
   network:
-    name: actor_critic
+    name: forge_custom_actor
     separate: False
 
     space:
@@ -28,8 +28,42 @@ params:
           name: const_initializer
           val: 0
         fixed_sigma: False
+
+    cnn:
+      type: conv2d
+      activation: relu
+      initializer:
+        name: default
+      regularizer:
+        name: None
+      convs:
+        - filters: 64
+          kernel_size: 5
+          strides: 1
+          padding: 0
+        - filters: 128
+          kernel_size: 3
+          strides: 1
+          padding: 0
+        - filters: 256
+          kernel_size: 3
+          strides: 1
+          padding: 0
+        - filters: 512
+          kernel_size: 3
+          strides: 1
+          padding: 0
+
+    rnn:
+      name: lstm
+      units: 512
+      layers: 2
+      before_mlp: True
+      concat_input: True
+      layer_norm: True
+
     mlp:
-      units: [512, 128, 64]
+      units: [512, 256]
       activation: elu
       d2rl: False
 
@@ -37,14 +71,6 @@ params:
         name: default
       regularizer:
         name: None
-
-    rnn:
-      name: lstm
-      units: 1024
-      layers: 2
-      before_mlp: True
-      concat_input: True
-      layer_norm: True
 
   load_checkpoint: False
   load_path: ""
@@ -101,8 +127,9 @@ params:
         name: actor_critic
         central_value: True
 
+        # Critic still consumes privileged state features, so keep it on the vector path.
         mlp:
-          units: [512, 128, 64]
+          units: [512, 256]
           activation: elu
           d2rl: False
 
@@ -113,7 +140,7 @@ params:
 
         rnn:
           name: lstm
-          units: 1024
+          units: 512
           layers: 2
           before_mlp: True
           concat_input: True

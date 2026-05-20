@@ -6,6 +6,7 @@
 import isaaclab.envs.mdp as mdp
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 
 from isaaclab_tasks.direct.factory.factory_env_cfg import OBS_DIM_CFG, STATE_DIM_CFG, CtrlCfg, FactoryEnvCfg, ObsRandCfg
@@ -98,6 +99,9 @@ class ForgeEnvCfg(FactoryEnvCfg):
     ctrl: ForgeCtrlCfg = ForgeCtrlCfg()
     task: ForgeTask = ForgeTask()
     events: EventCfg = EventCfg()
+
+    # TacSL sensors currently miss cloned env prims when Fabric cloning is enabled.
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=128, env_spacing=2.0, clone_in_fabric=False)
 
     ft_smoothing_factor: float = 0.25
 

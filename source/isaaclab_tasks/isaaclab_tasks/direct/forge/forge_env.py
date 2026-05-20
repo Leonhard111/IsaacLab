@@ -19,25 +19,32 @@ from .forge_env_cfg import ForgeEnvCfg
 
 class ForgeEnv(FactoryEnv):
     cfg: ForgeEnvCfg
+    tactile_frame_stack_size: int = 4
 
     def __init__(self, cfg: ForgeEnvCfg, render_mode: str | None = None, **kwargs):
         """Initialize additional randomization and logging tensors."""
         super().__init__(cfg, render_mode, **kwargs)
 
-        tactile_camera_cfg = self.cfg.tactile_sensor_left.camera_cfg
-        assert tactile_camera_cfg is not None
-        tactile_image_height = tactile_camera_cfg.height
-        tactile_image_width = tactile_camera_cfg.width
+        tactile_sensor_cfg = self.cfg.tactile_sensor_left
+        tactile_array_size = tactile_sensor_cfg.tactile_array_size
+        tactile_image_height = tactile_array_size[0]
+        tactile_image_width = tactile_array_size[1]
+        tactile_policy_channels = 3 * 2 * self.tactile_frame_stack_size
         tactile_policy_space = gym.spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(tactile_image_height, tactile_image_width, 6),
+            shape=(tactile_image_height, tactile_image_width, tactile_policy_channels),
             dtype=np.float32,
         )
         self.cfg.observation_space = tactile_policy_space
         self.single_observation_space["policy"] = tactile_policy_space
         self.observation_space = gym.vector.utils.batch_space(tactile_policy_space, self.num_envs)
         self._tactile_policy_obs_ready = False
+        self._tactile_left_force_history = torch.zeros(
+            (self.num_envs, self.tactile_frame_stack_size, tactile_image_height, tactile_image_width, 3),
+            device=self.device,
+        )
+        self._tactile_right_force_history = torch.zeros_like(self._tactile_left_force_history)
 
         # Success prediction.
         self.success_pred_scale = 0.0
@@ -69,6 +76,47 @@ class ForgeEnv(FactoryEnv):
 
         self.pos_threshold = self.default_pos_threshold.clone()
         self.rot_threshold = self.default_rot_threshold.clone()
+
+    def _tactile_force_to_map(self, tactile_normal_force: torch.Tensor, tactile_shear_force: torch.Tensor) -> torch.Tensor:
+        """Convert flattened tactile force buffers into a dense force map."""
+        tactile_array_size = self._tactile_sensor_left.cfg.tactile_array_size
+        nrows, ncols = tactile_array_size[0], tactile_array_size[1]
+        normal_force = tactile_normal_force.reshape(self.num_envs, nrows, ncols, 1)
+        shear_force = tactile_shear_force.reshape(self.num_envs, nrows, ncols, 2)
+        return torch.cat((normal_force, shear_force), dim=-1)
+
+    def _get_tactile_policy_obs(self) -> torch.Tensor:
+        """Build the policy observation tensor from left and right tactile force maps."""
+        left_tactile_normal = self._tactile_sensor_left.data.tactile_normal_force
+        left_tactile_shear = self._tactile_sensor_left.data.tactile_shear_force
+        right_tactile_normal = self._tactile_sensor_right.data.tactile_normal_force
+        right_tactile_shear = self._tactile_sensor_right.data.tactile_shear_force
+        if (
+            left_tactile_normal is None
+            or left_tactile_shear is None
+            or right_tactile_normal is None
+            or right_tactile_shear is None
+        ):
+            raise RuntimeError("Tactile force observations are not available. Call get_initial_render() first.")
+
+        left_tactile_force = self._tactile_force_to_map(left_tactile_normal, left_tactile_shear)
+        right_tactile_force = self._tactile_force_to_map(right_tactile_normal, right_tactile_shear)
+
+        self._tactile_left_force_history = torch.roll(self._tactile_left_force_history, shifts=-1, dims=1)
+        self._tactile_right_force_history = torch.roll(self._tactile_right_force_history, shifts=-1, dims=1)
+        self._tactile_left_force_history[:, -1] = left_tactile_force
+        self._tactile_right_force_history[:, -1] = right_tactile_force
+
+        left_history = self._tactile_left_force_history
+        right_history = self._tactile_right_force_history
+
+        left_stacked = left_history.permute(0, 2, 3, 1, 4).reshape(
+            self.num_envs, left_tactile_force.shape[1], left_tactile_force.shape[2], -1
+        )
+        right_stacked = right_history.permute(0, 2, 3, 1, 4).reshape(
+            self.num_envs, right_tactile_force.shape[1], right_tactile_force.shape[2], -1
+        )
+        return torch.cat((left_stacked, right_stacked), dim=-1)
 
     def _compute_intermediate_values(self, dt):
         """Add noise to observations for force sensing."""
@@ -133,12 +181,7 @@ class ForgeEnv(FactoryEnv):
         """Add additional FORGE observations."""
         _, state_dict = self._get_factory_obs_state_dict()
 
-        left_tactile_rgb = self._tactile_sensor_left.data.tactile_rgb_image
-        right_tactile_rgb = self._tactile_sensor_right.data.tactile_rgb_image
-        if left_tactile_rgb is None or right_tactile_rgb is None:
-            raise RuntimeError("Tactile RGB observations are not available. Call get_initial_render() first.")
-
-        obs_tensors = torch.cat((left_tactile_rgb, right_tactile_rgb), dim=-1)
+        obs_tensors = self._get_tactile_policy_obs()
 
         prev_actions = self.actions.clone()
         prev_actions[:, 3:5] = 0.0
@@ -232,12 +275,61 @@ class ForgeEnv(FactoryEnv):
         ctrl_target_fingertip_midpoint_quat = torch_utils.quat_from_euler_xyz(
             roll=desired_xyz[:, 0], pitch=desired_xyz[:, 1], yaw=desired_xyz[:, 2]
         )
+        
+        super()._apply_action()
 
-        self.generate_ctrl_signals(
-            ctrl_target_fingertip_midpoint_pos=ctrl_target_fingertip_midpoint_pos,
-            ctrl_target_fingertip_midpoint_quat=ctrl_target_fingertip_midpoint_quat,
-            ctrl_target_gripper_dof_pos=0.7,
-        )
+    # #factory env action
+    # def _apply_action(self):
+    #     """Apply actions for policy as delta targets from current position."""
+    #     # Note: We use finite-differenced velocities for control and observations.
+    #     # Check if we need to re-compute velocities within the decimation loop.
+    #     if self.last_update_timestamp < self._robot._data._sim_timestamp:
+    #         self._compute_intermediate_values(dt=self.physics_dt)
+
+    #     # Interpret actions as target pos displacements and set pos target
+    #     pos_actions = self.actions[:, 0:3] * self.pos_threshold
+
+    #     # Interpret actions as target rot (axis-angle) displacements
+    #     rot_actions = self.actions[:, 3:6]
+    #     if self.cfg_task.unidirectional_rot:
+    #         rot_actions[:, 2] = -(rot_actions[:, 2] + 1.0) * 0.5  # [-1, 0]
+    #     rot_actions = rot_actions * self.rot_threshold
+
+    #     ctrl_target_fingertip_midpoint_pos = self.fingertip_midpoint_pos + pos_actions
+    #     # To speed up learning, never allow the policy to move more than 5cm away from the base.
+    #     fixed_pos_action_frame = self.fixed_pos_obs_frame + self.init_fixed_pos_obs_noise
+    #     delta_pos = ctrl_target_fingertip_midpoint_pos - fixed_pos_action_frame
+    #     pos_error_clipped = torch.clip(
+    #         delta_pos, -self.cfg.ctrl.pos_action_bounds[0], self.cfg.ctrl.pos_action_bounds[1]
+    #     )
+    #     ctrl_target_fingertip_midpoint_pos = fixed_pos_action_frame + pos_error_clipped
+
+    #     # Convert to quat and set rot target
+    #     angle = torch.norm(rot_actions, p=2, dim=-1)
+    #     axis = rot_actions / angle.unsqueeze(-1)
+
+    #     rot_actions_quat = torch_utils.quat_from_angle_axis(angle, axis)
+    #     rot_actions_quat = torch.where(
+    #         angle.unsqueeze(-1).repeat(1, 4) > 1e-6,
+    #         rot_actions_quat,
+    #         torch.tensor([1.0, 0.0, 0.0, 0.0], device=self.device).repeat(self.num_envs, 1),
+    #     )
+    #     ctrl_target_fingertip_midpoint_quat = torch_utils.quat_mul(rot_actions_quat, self.fingertip_midpoint_quat)
+
+    #     target_euler_xyz = torch.stack(torch_utils.get_euler_xyz(ctrl_target_fingertip_midpoint_quat), dim=1)
+    #     target_euler_xyz[:, 0] = 3.14159  # Restrict actions to be upright.
+    #     target_euler_xyz[:, 1] = 0.0
+
+    #     ctrl_target_fingertip_midpoint_quat = torch_utils.quat_from_euler_xyz(
+    #         roll=target_euler_xyz[:, 0], pitch=target_euler_xyz[:, 1], yaw=target_euler_xyz[:, 2]
+    #     )
+
+    #     self.generate_ctrl_signals(
+    #         ctrl_target_fingertip_midpoint_pos=ctrl_target_fingertip_midpoint_pos,
+    #         ctrl_target_fingertip_midpoint_quat=ctrl_target_fingertip_midpoint_quat,
+    #         ctrl_target_gripper_dof_pos=0.7,
+    #     )
+
 
     def _get_rewards(self):
         """FORGE reward includes a contact penalty and success prediction error."""
@@ -287,6 +379,8 @@ class ForgeEnv(FactoryEnv):
             self._tactile_sensor_left.get_initial_render()
             self._tactile_sensor_right.get_initial_render()
             self._tactile_policy_obs_ready = True
+            self._tactile_left_force_history.zero_()
+            self._tactile_right_force_history.zero_()
 
         # Compute initial action for correct EMA computation.
         fixed_pos_action_frame = self.fixed_pos_obs_frame + self.init_fixed_pos_obs_noise
