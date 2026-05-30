@@ -213,6 +213,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
             # perform operations for terminated episodes
             if len(dones) > 0:
+                print(dones)
+                print("mission success了吗")
                 # reset rnn state for terminated episodes
                 if agent.is_rnn and agent.states is not None:
                     for s in agent.states:

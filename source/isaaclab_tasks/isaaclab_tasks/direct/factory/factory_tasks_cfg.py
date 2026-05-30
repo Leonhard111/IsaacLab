@@ -9,7 +9,7 @@ from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 ASSET_DIR = f"{ISAACLAB_NUCLEUS_DIR}/Factory"
-
+SELF_ASSET_DIR = "/home/ubuntu/Downloads/"
 
 @configclass
 class FixedAssetCfg:
@@ -57,7 +57,7 @@ class FactoryTask:
     unidirectional_rot: bool = False
 
     # Fixed Asset (applies to all tasks)
-    fixed_asset_init_pos_noise: list = [0.05, 0.05, 0.05]
+    fixed_asset_init_pos_noise: list = [0.004, 0.004, 0.0]
     fixed_asset_init_orn_deg: float = 0.0
     fixed_asset_init_orn_range_deg: float = 360.0
 
@@ -86,7 +86,20 @@ class FactoryTask:
 
 @configclass
 class Peg8mm(HeldAssetCfg):
-    usd_path = f"{ASSET_DIR}/factory_peg_8mm.usd"
+    # print("****************")
+    # print("****************")
+    # print("****************")
+    # print("****************")
+    # print("****************")
+    # print(f"{ASSET_DIR}/factory_peg_8mm.usd")
+    # print("****************")
+    # print("****************")
+    # print("****************")
+    # print("****************")
+    # print("****************")
+    
+    # usd_path = f"{ASSET_DIR}/factory_peg_8mm.usd"
+    usd_path = f"{SELF_ASSET_DIR}/factory_cube.usd"
     diameter = 0.007986
     height = 0.050
     mass = 0.019
@@ -115,7 +128,7 @@ class PegInsert(FactoryTask):
     hand_init_orn_noise: list = [0.0, 0.0, 0.785]
 
     # Fixed Asset (applies to all tasks)
-    fixed_asset_init_pos_noise: list = [0.05, 0.05, 0.05]
+    fixed_asset_init_pos_noise: list = [0.003, 0.003, 0.003]
     fixed_asset_init_orn_deg: float = 0.0
     fixed_asset_init_orn_range_deg: float = 360.0
 

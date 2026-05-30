@@ -701,14 +701,12 @@ class FactoryEnv(DirectRLEnv):
             n_bad = bad_envs.shape[0]
 
             above_fixed_pos = fixed_tip_pos.clone()
+
             print("*****************")
+            print(above_fixed_pos.shape)
+            above_fixed_pos[:,2] -= 0.05
             print("*****************")
-            print("*****************")
-            print(above_fixed_pos)
-            # above_fixed_pos[:,2] += 0.05
-            print("*****************")
-            print("*****************")
-            print("*****************")
+
             above_fixed_pos[:, 2] += self.cfg_task.hand_init_pos[2]
 
             rand_sample = torch.rand((n_bad, 3), dtype=torch.float32, device=self.device)
@@ -737,7 +735,7 @@ class FactoryEnv(DirectRLEnv):
                 ctrl_target_fingertip_midpoint_quat=hand_down_quat,
                 env_ids=bad_envs,
             )
-            print(pos_error, aa_error)
+            # print(pos_error, aa_error)
             pos_error = torch.linalg.norm(pos_error, dim=1) > 1e-3
             angle_error = torch.norm(aa_error, dim=1) > 1e-3
             any_error = torch.logical_or(pos_error, angle_error)
@@ -809,7 +807,7 @@ class FactoryEnv(DirectRLEnv):
 
         held_state = self._held_asset.data.default_root_state.clone()
         held_state[:, 0:3] = translated_held_asset_pos + self.scene.env_origins
-        held_state[:, 2] += 0.04
+        held_state[:, 2] += 0.03 # 0.03 感觉可以用，之前策略用的是0.04
         held_state[:, 3:7] = translated_held_asset_quat
         held_state[:, 7:] = 0.0
         self._held_asset.write_root_pose_to_sim(held_state[:, 0:7])
